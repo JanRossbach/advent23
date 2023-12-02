@@ -3,33 +3,18 @@ use std::collections::HashMap;
 
 #[derive(Debug)]
 pub struct GameSet {
-    cubes: HashMap<String, usize>,
+    red: usize,
+    green: usize,
+    blue: usize,
 }
 
 impl GameSet {
-    pub fn get(&self, color: &str) -> usize {
-        *self.cubes.get(color).unwrap_or(&0)
-    }
-
     pub fn is_possible(&self, red: usize, green: usize, blue: usize) -> bool {
-        let mut possible = true;
-        if self.get("red") > red {
-            possible = false;
-        }
-        if self.get("green") > green {
-            possible = false;
-        }
-        if self.get("blue") > blue {
-            possible = false;
-        }
-        possible
+        self.green <= green && self.blue <= blue && self.red <= red
     }
 
     pub fn power(&self) -> usize {
-        let r = self.get("red");
-        let g = self.get("green");
-        let b = self.get("blue");
-        r * g * b
+        self.red * self.green * self.blue
     }
 }
 
@@ -53,7 +38,11 @@ impl Game {
                     let count: usize = cap[1].parse().unwrap();
                     cubes.insert(color, count);
                 }
-                GameSet { cubes }
+                GameSet {
+                    red: *cubes.get("red").unwrap_or(&0),
+                    green: *cubes.get("green").unwrap_or(&0),
+                    blue: *cubes.get("blue").unwrap_or(&0),
+                }
             })
             .collect::<Vec<GameSet>>();
         Game { id, sets }
@@ -79,24 +68,11 @@ impl Game {
     }
 
     pub fn min_possible(&self) -> GameSet {
-        let (r, g, b): (usize, usize, usize) =
+        let (red, green, blue): (usize, usize, usize) =
             self.sets.iter().fold((0, 0, 0), |(r, g, b), set| {
-                (
-                    r.max(set.get("red")),
-                    g.max(set.get("green")),
-                    b.max(set.get("blue")),
-                )
+                (r.max(set.red), g.max(set.green), b.max(set.blue))
             });
-        GameSet {
-            cubes: [
-                ("red".to_string(), r),
-                ("green".to_string(), g),
-                ("blue".to_string(), b),
-            ]
-            .iter()
-            .cloned()
-            .collect(),
-        }
+        GameSet { red, green, blue }
     }
 }
 
@@ -133,8 +109,8 @@ mod tests {
     fn test_input_parse() {
         let parsed_input = parse_input(TEST_INPUT);
         assert_eq!(parsed_input.len(), 5);
-        assert_eq!(parsed_input[0].get(0).get("red"), 4);
-        assert_eq!(parsed_input[0].get(1).get("green"), 2);
+        assert_eq!(parsed_input[0].get(0).red, 4);
+        assert_eq!(parsed_input[0].get(1).green, 2);
     }
 
     #[test]
