@@ -1,4 +1,4 @@
 
 pub fn main() {
-    advent::day5::main();
+    advent::day7::main();
 }
