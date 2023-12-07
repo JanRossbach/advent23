@@ -1,8 +1,20 @@
-use std::cmp::Ordering;
+use core::fmt;
+use std::{cmp::Ordering, fmt::Formatter};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 struct Card {
     pub rank: u8,
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+enum HandType {
+    HighCard,
+    OnePair,
+    TwoPair,
+    ThreeOfAKind,
+    FullHouse,
+    FourOfAKind,
+    FiveOfAKind,
 }
 
 impl Card {
@@ -24,99 +36,61 @@ impl Card {
 struct Hand {
     pub cards: Vec<Card>,
     pub bid: usize,
+    pub hand_type: HandType,
 }
 
 impl Hand {
-    pub fn four_of_a_kind(&self) -> Option<u8> {
-        let mut ranks = [0; 15];
-        for card in self.cards.iter() {
-            ranks[card.rank as usize] += 1;
+    pub fn from_line(line: &str) -> Self {
+        let re = regex::Regex::new(r"([2-9TJQKA]{5}) (\d+)").unwrap();
+        let captures = re.captures(line).unwrap();
+        let cards = captures[1]
+            .chars()
+            .map(|c| Card::from_char(c))
+            .collect::<Vec<_>>();
+        let bid = captures[2].parse::<usize>().unwrap();
+        let hand_type: HandType = find_type(&cards);
+        Hand {
+            cards,
+            bid,
+            hand_type,
         }
-        for (rank, count) in ranks.iter().enumerate() {
-            if *count == 4 {
-                return Some(rank as u8);
-            }
-        }
-        None
     }
+}
 
-    pub fn full_house(&self) -> Option<u8> {
-        let mut ranks = [0; 15];
-        for card in self.cards.iter() {
-            ranks[card.rank as usize] += 1;
-        }
-        let mut three_of_a_kind = None;
-        let mut two_of_a_kind = None;
-        for (rank, count) in ranks.iter().enumerate() {
-            if *count == 3 {
-                three_of_a_kind = Some(rank as u8);
-            } else if *count == 2 {
-                two_of_a_kind = Some(rank as u8);
-            }
-        }
-        if three_of_a_kind.is_some() && two_of_a_kind.is_some() {
-            return three_of_a_kind;
-        }
-        None
+fn find_type(cards: &Vec<Card>) -> HandType {
+    let mut ranks = [0; 15];
+    for card in cards.iter() {
+        ranks[card.rank as usize] += 1;
     }
-
-    pub fn three_of_a_kind(&self) -> Option<u8> {
-        let mut ranks = [0; 15];
-        for card in self.cards.iter() {
-            ranks[card.rank as usize] += 1;
+    let mut num_pairs = 0;
+    let mut num_triples = 0;
+    let mut num_quads = 0;
+    let mut num_quints = 0;
+    for count in ranks.iter() {
+        if *count == 2 {
+            num_pairs += 1;
+        } else if *count == 3 {
+            num_triples += 1;
+        } else if *count == 4 {
+            num_quads += 1;
+        } else if *count == 5 {
+            num_quints += 1;
         }
-        for (rank, count) in ranks.iter().enumerate() {
-            if *count == 3 {
-                return Some(rank as u8);
-            }
-        }
-        None
     }
-
-    pub fn two_of_a_kind(&self) -> Option<u8> {
-        let mut ranks = [0; 15];
-        for card in self.cards.iter() {
-            ranks[card.rank as usize] += 1;
-        }
-        for (rank, count) in ranks.iter().enumerate() {
-            if *count == 2 {
-                return Some(rank as u8);
-            }
-        }
-        None
+    if num_quints == 1 {
+        return HandType::FiveOfAKind;
+    } else if num_quads == 1 {
+        return HandType::FourOfAKind;
+    } else if num_triples == 1 && num_pairs == 1 {
+        return HandType::FullHouse;
+    } else if num_triples == 1 {
+        return HandType::ThreeOfAKind;
+    } else if num_pairs == 2 {
+        return HandType::TwoPair;
+    } else if num_pairs == 1 {
+        return HandType::OnePair;
     }
-
-    pub fn two_pair_high(&self) -> Option<u8> {
-        let mut ranks = [0; 15];
-        for card in self.cards.iter() {
-            ranks[card.rank as usize] += 1;
-        }
-        let mut high_pair = None;
-        let mut low_pair = None;
-        for (rank, count) in ranks.iter().enumerate() {
-            if *count == 2 {
-                if high_pair.is_none() {
-                    high_pair = Some(rank as u8);
-                } else {
-                    low_pair = Some(rank as u8);
-                }
-            }
-        }
-        if high_pair.is_some() && low_pair.is_some() {
-            return Some(high_pair.unwrap());
-        }
-        None
-    }
-
-    pub fn high_card(&self) -> u8 {
-        let mut high_card = 0;
-        for card in self.cards.iter() {
-            if card.rank > high_card {
-                high_card = card.rank;
-            }
-        }
-        high_card
-    }
+    HandType::HighCard
 }
 
 impl PartialEq for Hand {
@@ -129,41 +103,81 @@ impl Eq for Hand {}
 
 impl PartialOrd for Hand {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        let mut self_ranks = [0; 15];
-        let mut other_ranks = [0; 15];
-        if let Some(rank) = self.four_of_a_kind() {
-            if let Some(other_rank) = other.four_of_a_kind() {
-                return Some(rank.cmp(&other_rank));
+        if self.hand_type != other.hand_type {
+            return Some(self.hand_type.cmp(&other.hand_type));
+        }
+        for i in 0..5 {
+            if self.cards[i] == other.cards[i] {
+                continue;
+            } else {
+                return Some(self.cards[i].cmp(&other.cards[i]));
             }
         }
+        Some(Ordering::Equal)
+    }
+}
 
-        return Some(Ordering::Equal);
+impl fmt::Display for Hand {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let repr = self
+            .cards
+            .iter()
+            .map(|c| match c.rank {
+                10 => "T".to_string(),
+                11 => "J".to_string(),
+                12 => "Q".to_string(),
+                13 => "K".to_string(),
+                14 => "A".to_string(),
+                _ => c.rank.to_string(),
+            })
+            .collect::<Vec<_>>()
+            .join("");
+        write!(f, "{}", repr)
     }
 }
 
 impl Ord for Hand {
-    pub fn cmp(&self, other) {
-
+    fn cmp(&self, other: &Hand) -> Ordering {
+        self.partial_cmp(other).unwrap()
     }
 }
 
 fn parse_input(input: &str) -> Vec<Hand> {
     let mut hands = Vec::new();
-    let re = regex::Regex::new(r"([2-9TJQKA]{5}) (\d+)").unwrap();
     for line in input.lines() {
-        let captures = re.captures(line).unwrap();
-        let cards = captures[1]
-            .chars()
-            .map(|c| Card::from_char(c))
-            .collect::<Vec<_>>();
-        let bid = captures[2].parse::<usize>().unwrap();
-        hands.push(Hand { cards , bid });
+        hands.push(Hand::from_line(line));
     }
     hands
 }
 
 pub fn main() {
-    let input = std::fs::read_to_string("data/test_input7.txt").unwrap();
-    let hands = parse_input(&input);
-    println!("Hands: {:?}", hands);
+    let input = std::fs::read_to_string("data/input7.txt").unwrap();
+    let mut hands = parse_input(&input);
+    hands.sort();
+    let result: usize = hands.iter().enumerate().map( |(i, c)| {
+        // println!("{} {}", i+1, c);
+        (i+1) * c.bid
+    }).sum();
+    println!("Day 7 Result: {}", result);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_day7_kind_compare() {
+        assert!(HandType::FourOfAKind > HandType::FullHouse);
+        assert!(HandType::FullHouse > HandType::ThreeOfAKind);
+        assert!(HandType::ThreeOfAKind > HandType::TwoPair);
+        assert!(HandType::TwoPair > HandType::OnePair);
+        assert!(HandType::OnePair > HandType::HighCard);
+    }
+
+    #[test]
+    fn test_compare_hands() {
+        let hand1 = Hand::from_line("2QQQA 220");
+        let hand2 = Hand::from_line("2QQQK 483");
+        assert!(hand1 > hand2);
+    }
 }
