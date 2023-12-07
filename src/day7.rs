@@ -71,13 +71,29 @@ fn find_type(cards: &Vec<Card>) -> HandType {
         }
     }
     // Turn jokers into the card with the most occurences
-    if max_index != 1 {
-        ranks[max_index] += ranks[1];
-        ranks[1] = 0;
+    if max_index == 1 && ranks[1] > 1 {
+        let second_highest_rank = ranks
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| *i != 1)
+            .max_by_key(|(_, count)| *count)
+            .unwrap()
+            .0;
+        match ranks[second_highest_rank] + ranks[1] {
+            5 => return HandType::FiveOfAKind,
+            4 => return HandType::FourOfAKind,
+            3 => return HandType::ThreeOfAKind,
+            _ => {
+                let err_msg = format!("Invalid hand with joker: {:?}", cards);
+                panic!("{}", err_msg);
+            }
+        }
     } else if max_num == 1 && ranks[1] == 1 {
-        // We already know it is a pair
+        // We have a high card hand with a joker, so we can just return a pair
         return HandType::OnePair;
     }
+    ranks[max_index] += ranks[1];
+    ranks[1] = 0;
     let mut num_pairs = 0;
     let mut num_triples = 0;
     let mut num_quads = 0;
@@ -172,7 +188,7 @@ pub fn main() {
     let mut hands = parse_input(&input);
     hands.sort();
     let result: usize = hands.iter().enumerate().map( |(i, c)| {
-        println!("{} {}", i+1, c);
+        // println!("{} {}", i+1, c);
         (i+1) * c.bid
     }).sum();
     println!("Day 7 Result: {}", result);
