@@ -22,7 +22,7 @@ impl Card {
         let rank = match c {
             '2'..='9' => c.to_digit(10).unwrap() as u8,
             'T' => 10,
-            'J' => 11,
+            'J' => 1,
             'Q' => 12,
             'K' => 13,
             'A' => 14,
@@ -62,6 +62,22 @@ fn find_type(cards: &Vec<Card>) -> HandType {
     for card in cards.iter() {
         ranks[card.rank as usize] += 1;
     }
+    let mut max_index = 0;
+    let mut max_num = 0;
+    for (i, count) in ranks.iter().enumerate() {
+        if *count > max_num {
+            max_num = *count;
+            max_index = i;
+        }
+    }
+    // Turn jokers into the card with the most occurences
+    if max_index != 1 {
+        ranks[max_index] += ranks[1];
+        ranks[1] = 0;
+    } else if max_num == 1 && ranks[1] == 1 {
+        // We already know it is a pair
+        return HandType::OnePair;
+    }
     let mut num_pairs = 0;
     let mut num_triples = 0;
     let mut num_quads = 0;
@@ -77,6 +93,7 @@ fn find_type(cards: &Vec<Card>) -> HandType {
             num_quints += 1;
         }
     }
+
     if num_quints == 1 {
         return HandType::FiveOfAKind;
     } else if num_quads == 1 {
@@ -85,7 +102,7 @@ fn find_type(cards: &Vec<Card>) -> HandType {
         return HandType::FullHouse;
     } else if num_triples == 1 {
         return HandType::ThreeOfAKind;
-    } else if num_pairs == 2 {
+    } else if num_pairs == 2  {
         return HandType::TwoPair;
     } else if num_pairs == 1 {
         return HandType::OnePair;
@@ -124,7 +141,7 @@ impl fmt::Display for Hand {
             .iter()
             .map(|c| match c.rank {
                 10 => "T".to_string(),
-                11 => "J".to_string(),
+                1 => "J".to_string(),
                 12 => "Q".to_string(),
                 13 => "K".to_string(),
                 14 => "A".to_string(),
@@ -132,7 +149,7 @@ impl fmt::Display for Hand {
             })
             .collect::<Vec<_>>()
             .join("");
-        write!(f, "{}", repr)
+        write!(f, "{}", format!("[{} {:?}]", repr, self.hand_type))
     }
 }
 
@@ -155,7 +172,7 @@ pub fn main() {
     let mut hands = parse_input(&input);
     hands.sort();
     let result: usize = hands.iter().enumerate().map( |(i, c)| {
-        // println!("{} {}", i+1, c);
+        println!("{} {}", i+1, c);
         (i+1) * c.bid
     }).sum();
     println!("Day 7 Result: {}", result);
